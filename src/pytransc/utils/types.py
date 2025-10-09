@@ -68,7 +68,7 @@ class MultiStateDraw(Protocol):
         ...
 
 
-class SampleableMultiStateDensity(MultiStateDensity, MultiStateDraw, Protocol):
+class SampleableMultiStateDensity(Protocol):
     """Protocol for multi-state density functions that support sampling.
 
     This protocol extends MultiStateDensity to include the ability to
@@ -76,6 +76,9 @@ class SampleableMultiStateDensity(MultiStateDensity, MultiStateDraw, Protocol):
     used by the state-jump sampler for drawing from pseudo-priors
     when proposing between-state moves.
     """
+
+    __call__: MultiStateDensity
+    draw_deviate: MultiStateDraw
 
 
 class ProposableMultiStateDensity(MultiStateDensity, Protocol):
