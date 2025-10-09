@@ -23,8 +23,16 @@ class CustomPseudoPrior:
         draw_deviate_fn : MultiStateDraw
             Function to draw a random deviate from the pseudo-prior.
         """
-        self.__call__ = log_pseudo_prior_fn
-        self.draw_deviate = draw_deviate_fn
+        self._log_pseudo_prior_fn = log_pseudo_prior_fn
+        self._draw_deviate_fn = draw_deviate_fn
+
+    def __call__(self, x: FloatArray, state: int) -> float:
+        """Evaluate the log pseudo-prior density."""
+        return self._log_pseudo_prior_fn(x, state)
+
+    def draw_deviate(self, state: int) -> FloatArray:
+        """Draw a random deviate from the pseudo-prior for a given state."""
+        return self._draw_deviate_fn(state)
 
 
 def build_custom_pseudo_prior(
