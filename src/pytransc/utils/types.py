@@ -48,16 +48,10 @@ class MultiStateDensity(Protocol):
         ...
 
 
-class SampleableMultiStateDensity(MultiStateDensity, Protocol):
-    """Protocol for multi-state density functions that support sampling.
+class MultiStateDraw(Protocol):
+    """Protocol for multi-state density functions that support drawing."""
 
-    This protocol extends MultiStateDensity to include the ability to
-    generate random samples from the distribution. This is primarily
-    used by the state-jump sampler for drawing from pseudo-priors
-    when proposing between-state moves.
-    """
-
-    def draw_deviate(self, state: int) -> FloatArray:
+    def __call__(self, state: int) -> FloatArray:
         """Draw a random sample from the distribution for the given state.
 
         Parameters
@@ -72,6 +66,16 @@ class SampleableMultiStateDensity(MultiStateDensity, Protocol):
             Shape should match the parameter space dimension for that state.
         """
         ...
+
+
+class SampleableMultiStateDensity(MultiStateDensity, MultiStateDraw, Protocol):
+    """Protocol for multi-state density functions that support sampling.
+
+    This protocol extends MultiStateDensity to include the ability to
+    generate random samples from the distribution. This is primarily
+    used by the state-jump sampler for drawing from pseudo-priors
+    when proposing between-state moves.
+    """
 
 
 class ProposableMultiStateDensity(MultiStateDensity, Protocol):
