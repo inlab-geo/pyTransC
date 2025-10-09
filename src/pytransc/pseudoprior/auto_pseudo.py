@@ -3,19 +3,17 @@
 from enum import StrEnum, auto
 from typing import Any, Protocol
 
-import numpy as np
-from scipy import stats
-from scipy.stats._multivariate import multivariate_normal_frozen
-from sklearn.mixture import GaussianMixture
-
 from ..samplers.per_state import run_mcmc_per_state
-from .exceptions import InputError
-from .types import (
+from ..utils.exceptions import InputError
+from ..utils.types import (
     FloatArray,
     MultiStateDensity,
     MultiStateDraw,
     SampleableMultiStateDensity,
 )
+from .custom import build_custom_pseudo_prior
+from .gaussian_mixture import build_gaussian_mixture_pseudo_prior
+from .mean_covariance import build_mean_covariance_pseudo_prior
 
 
 class PseudoPriorOptions(StrEnum):
@@ -24,78 +22,6 @@ class PseudoPriorOptions(StrEnum):
     GAUSSIAN_MIXTURE = auto()
     MEAN_COVARIANCE = auto()
     CUSTOM = auto()
-
-
-class GaussianMixturePseudoPrior:
-    """Class for Gaussian mixture pseudo-prior."""
-
-    def __init__(self, gaussian_mixtures: list[GaussianMixture]) -> None:
-        """
-        Initialize the Gaussian mixture pseudo-prior.
-
-        Parameters
-        ----------
-        ensemble_per_state : list of FloatArray
-            List of ensembles for each state.
-        kwargs : dict
-            Additional arguments for Gaussian mixture fitting.
-        """
-        self.gaussian_mixtures = gaussian_mixtures
-
-    def __call__(self, x: FloatArray, state: int) -> float:
-        """Evaluate the log pseudo-prior density."""
-        gmm = self.gaussian_mixtures[state]
-        return float(gmm.score(np.array([x])))
-
-    def draw_deviate(self, state: int) -> FloatArray:
-        """Draw a random deviate from the pseudo-prior for a given state."""
-        gmm = self.gaussian_mixtures[state]
-        return gmm.sample()[0][0]
-
-
-class MeanCovariancePseudoPrior:
-    """Class for mean and covariance pseudo-prior."""
-
-    def __init__(self, rv_list: list[multivariate_normal_frozen]):
-        """
-        Initialize the mean and covariance pseudo-prior.
-
-        Parameters
-        ----------
-        rv_list : list of scipy.stats._multivariate.multivariate_normal_frozen
-            List of multivariate fitted normal distributions for each state.
-        """
-        self.rv_list = rv_list
-
-    def __call__(self, x: FloatArray, state: int) -> float:
-        """Evaluate the log pseudo-prior density."""
-        rv = self.rv_list[state]
-        return rv.logpdf(x)
-
-    def draw_deviate(self, state: int) -> FloatArray:
-        """Draw a random deviate from the pseudo-prior for a given state."""
-        rv = self.rv_list[state]
-        return rv.rvs(size=1)[0]
-
-
-class CustomPseudoPrior:
-    """Class for custom pseudo-prior."""
-
-    def __init__(
-        self, log_pseudo_prior_fn: MultiStateDensity, draw_deviate_fn: MultiStateDraw
-    ) -> None:
-        """
-        Initialize the custom pseudo-prior.
-
-        Parameters
-        ----------
-        log_pseudo_prior_fn : MultiStateDensity
-            Function to evaluate the log pseudo-prior density.
-        draw_deviate_fn : MultiStateDraw
-            Function to draw a random deviate from the pseudo-prior.
-        """
-        self.__call__ = log_pseudo_prior_fn
-        self.draw_deviate = draw_deviate_fn
 
 
 class PseudoPriorBuilder(Protocol):
@@ -118,68 +44,6 @@ class PseudoPriorBuilder(Protocol):
         Returns a callable pseudo-prior function.
         """
         ...
-
-
-def build_gaussian_mixture_pseudo_prior(
-    ensemble_per_state: list[FloatArray], **kwargs: Any
-) -> GaussianMixturePseudoPrior:
-    """
-    Build a Gaussian mixture pseudo-prior function.
-
-    Args:
-        ensemble_per_state (list[FloatArray]): List of ensembles for each state.
-        **kwargs: Additional keyword arguments for Gaussian mixture fitting.
-
-    Returns:
-        list[GaussianMixture]: List of fitted Gaussian mixture models for each state.
-    """
-    gms = [
-        GaussianMixture(**kwargs).fit(state_ensemble)
-        for state_ensemble in ensemble_per_state
-    ]
-    return GaussianMixturePseudoPrior(gms)
-
-
-def build_mean_covariance_pseudo_prior(
-    ensemble_per_state: list[FloatArray],
-) -> MeanCovariancePseudoPrior:
-    """
-    Build a mean and covariance pseudo-prior function.
-
-    Args:
-        ensemble_per_state (list[FloatArray]): List of ensembles for each state.
-
-    Returns:
-        MeanCovariancePseudoPrior: Instance of MeanCovariancePseudoPrior.
-    """
-    rv_list = []
-    for state_ensemble in ensemble_per_state:
-        pseudo_covariances = np.cov(state_ensemble.T)
-        pseudo_means = np.mean(state_ensemble.T, axis=1)
-        rv = stats.multivariate_normal(mean=pseudo_means, cov=pseudo_covariances)
-        rv_list.append(rv)
-    return MeanCovariancePseudoPrior(rv_list)
-
-
-def build_custom_pseudo_prior(
-    ensemble_per_state: list[
-        FloatArray
-    ],  # this is here just to match the Protocol signature
-    *,
-    log_pseudo_prior_fn: MultiStateDensity,
-    draw_deviate_fn: MultiStateDraw,
-) -> CustomPseudoPrior:
-    """
-    Build a custom pseudo-prior function.
-
-    Args:
-        log_pseudo_prior_fn (MultiStateDensity): Function to evaluate the log pseudo-prior density.
-        draw_deviate_fn (MultiStateDraw): Function to draw a random deviate from the pseudo-prior.
-
-    Returns:
-        CustomPseudoPrior: Instance of CustomPseudoPrior.
-    """
-    return CustomPseudoPrior(log_pseudo_prior_fn, draw_deviate_fn)
 
 
 pseudo_prior_factories: dict[PseudoPriorOptions, PseudoPriorBuilder] = {
