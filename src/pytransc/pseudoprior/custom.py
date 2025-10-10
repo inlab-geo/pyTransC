@@ -23,6 +23,11 @@ class CustomPseudoPrior:
         draw_deviate_fn : MultiStateDraw
             Function to draw a random deviate from the pseudo-prior.
         """
+        if not callable(log_pseudo_prior_fn):
+            raise TypeError("log_pseudo_prior_fn must be callable")
+        if not callable(draw_deviate_fn):
+            raise TypeError("draw_deviate_fn must be callable")
+
         self._log_pseudo_prior_fn = log_pseudo_prior_fn
         self._draw_deviate_fn = draw_deviate_fn
 
