@@ -18,12 +18,15 @@ def ensemble_per_state() -> list[FloatArray]:
 
 
 @pytest.fixture
-def log_pseudo_prior_fn(x: FloatArray, state: int) -> float:
-    """Example log pseudo-prior function."""
-    return state * x.sum()
-
+def log_pseudo_prior_fn():
+    """Example log pseudo-prior function factory."""
+    def _log_pseudo_prior_fn(x: FloatArray, state: int) -> float:
+        return state * x.sum()
+    return _log_pseudo_prior_fn
 
 @pytest.fixture
-def draw_deviate_fn(state: int) -> FloatArray:
-    """Example draw deviate function."""
-    return np.ones(state)
+def draw_deviate_fn():
+    """Example draw deviate function factory."""
+    def _draw_deviate_fn(state: int) -> FloatArray:
+        return np.ones(state)
+    return _draw_deviate_fn
