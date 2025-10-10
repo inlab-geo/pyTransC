@@ -29,7 +29,7 @@ class MeanCovariancePseudoPrior:
     def draw_deviate(self, state: int) -> FloatArray:
         """Draw a random deviate from the pseudo-prior for a given state."""
         rv = self.rv_list[state]
-        return rv.rvs(size=1)[0]
+        return rv.rvs(size=1)
 
 
 def build_mean_covariance_pseudo_prior(
