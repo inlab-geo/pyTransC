@@ -4,21 +4,13 @@ import numpy as np
 import pytest
 
 from pytransc.pseudoprior.custom import CustomPseudoPrior, build_custom_pseudo_prior
-from pytransc.utils.types import FloatArray
-
-
-def log_pseudo_prior_fn(x: FloatArray, state: int) -> float:
-    """Example log pseudo-prior function."""
-    return state * x.sum()
-
-
-def draw_deviate_fn(state: int) -> FloatArray:
-    """Example draw deviate function."""
-    return np.ones(state)
+from pytransc.utils.types import MultiStateDensity, MultiStateDraw
 
 
 @pytest.fixture
-def custom_pseudo() -> CustomPseudoPrior:
+def custom_pseudo(
+    log_pseudo_prior_fn: MultiStateDensity, draw_deviate_fn: MultiStateDraw
+) -> CustomPseudoPrior:
     """Fixture providing a custom pseudo-prior."""
 
     return build_custom_pseudo_prior(
@@ -30,6 +22,8 @@ def custom_pseudo() -> CustomPseudoPrior:
 
 def test_custom_pseudo_prior_valid_initialization(
     custom_pseudo: CustomPseudoPrior,
+    log_pseudo_prior_fn: MultiStateDensity,
+    draw_deviate_fn: MultiStateDraw,
 ) -> None:
     """Test custom pseudo-prior initialization."""
 
@@ -38,7 +32,9 @@ def test_custom_pseudo_prior_valid_initialization(
     assert custom_pseudo._draw_deviate_fn is draw_deviate_fn
 
 
-def test_custom_pseudo_prior_invalid_initialization() -> None:
+def test_custom_pseudo_prior_invalid_initialization(
+    log_pseudo_prior_fn: MultiStateDensity, draw_deviate_fn: MultiStateDraw
+) -> None:
     """Test custom pseudo-prior invalid initialization."""
 
     with pytest.raises(TypeError, match="log_pseudo_prior_fn must be callable"):

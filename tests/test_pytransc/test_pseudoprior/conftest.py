@@ -15,3 +15,15 @@ def ensemble_per_state() -> list[FloatArray]:
     state_rvs = [multivariate_normal(mean=mu, cov=cov) for mu, cov in zip(mus, covs)]
 
     return [state_rv.rvs(size=50_000)[..., np.newaxis] for state_rv in state_rvs]
+
+
+@pytest.fixture
+def log_pseudo_prior_fn(x: FloatArray, state: int) -> float:
+    """Example log pseudo-prior function."""
+    return state * x.sum()
+
+
+@pytest.fixture
+def draw_deviate_fn(state: int) -> FloatArray:
+    """Example draw deviate function."""
+    return np.ones(state)
