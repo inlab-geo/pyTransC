@@ -114,7 +114,7 @@ def build_auto_pseudo_prior(
     if not ensemble_per_state:
         if log_posterior_fn is None:
             raise InputError(
-                "log_posterior must be provided if ensemble_per_state is not supplied."
+                "log_posterior_fn must be provided if ensemble_per_state is not supplied."
             )
         ensemble_per_state = _generate_missing_ensembles(
             log_posterior=log_posterior_fn, sampling_args=sampling_args
