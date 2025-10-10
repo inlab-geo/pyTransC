@@ -2,32 +2,22 @@
 
 import numpy as np
 import pytest
-from scipy.stats import multivariate_normal
 from sklearn.mixture import GaussianMixture
 
 from pytransc.pseudoprior.gaussian_mixture import (
     GaussianMixturePseudoPrior,
     build_gaussian_mixture_pseudo_prior,
 )
+from pytransc.utils.types import FloatArray
 
 
 @pytest.fixture
-def ensemble_per_state() -> list[np.ndarray]:
-    """Fixture for ensemble per state."""
-    mus = [0.0, 1.0]
-    covs = [1, 2]
-    state_rvs = [multivariate_normal(mean=mu, cov=cov) for mu, cov in zip(mus, covs)]
-
-    return [state_rv.rvs(size=50_000)[..., np.newaxis] for state_rv in state_rvs]
-
-
-@pytest.fixture
-def gm_pseudo(ensemble_per_state: list[np.ndarray]) -> GaussianMixturePseudoPrior:
+def gm_pseudo(ensemble_per_state: list[FloatArray]) -> GaussianMixturePseudoPrior:
     """Fixture for Gaussian Mixture pseudo-prior."""
     return build_gaussian_mixture_pseudo_prior(ensemble_per_state)
 
 
-def test_kwargs_handling(ensemble_per_state: list[np.ndarray]) -> None:
+def test_kwargs_handling(ensemble_per_state: list[FloatArray]) -> None:
     """Test that kwargs are correctly passed to GaussianMixture."""
     with pytest.raises(TypeError):
         # n_components should be an integer
@@ -45,7 +35,7 @@ def test_kwargs_handling(ensemble_per_state: list[np.ndarray]) -> None:
         assert gmm.reg_covar == 1
 
 
-def test_gaussian_mixture_pseudo_prior(ensemble_per_state: list[np.ndarray]) -> None:
+def test_gaussian_mixture_pseudo_prior(ensemble_per_state: list[FloatArray]) -> None:
     """Test Gaussian Mixture pseudo-priors are properly fitted."""
 
     gm_pseudo = build_gaussian_mixture_pseudo_prior(ensemble_per_state)
