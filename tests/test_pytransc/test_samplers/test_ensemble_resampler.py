@@ -138,7 +138,6 @@ class TestEnsembleResamplerParallelism:
             n_dims=n_dims,
             log_posterior_ens=log_posterior_ens,
             log_pseudo_prior_ens=log_pseudo_prior_ens,
-            parallel=False,
             progress=False
         )
         
@@ -151,20 +150,22 @@ class TestEnsembleResamplerParallelism:
 
     def test_parallel_ensemble_resampler(self, ensemble_data):
         """Test parallel ensemble resampler execution."""
+        from concurrent.futures import ProcessPoolExecutor
+
         n_states, n_dims, log_posterior_ens, log_pseudo_prior_ens = ensemble_data
-        
-        results = run_ensemble_resampler(
-            n_walkers=8,
-            n_steps=20,
-            n_states=n_states,
-            n_dims=n_dims,
-            log_posterior_ens=log_posterior_ens,
-            log_pseudo_prior_ens=log_pseudo_prior_ens,
-            parallel=True,
-            n_processors=2,
-            progress=False
-        )
-        
+
+        with ProcessPoolExecutor(max_workers=2) as walker_pool:
+            results = run_ensemble_resampler(
+                n_walkers=8,
+                n_steps=20,
+                n_states=n_states,
+                n_dims=n_dims,
+                log_posterior_ens=log_posterior_ens,
+                log_pseudo_prior_ens=log_pseudo_prior_ens,
+                walker_pool=walker_pool,
+                progress=False
+            )
+
         # Validate results
         assert results.n_walkers == 8
         assert results.n_states == n_states
@@ -174,11 +175,13 @@ class TestEnsembleResamplerParallelism:
 
     def test_ensemble_resampler_consistency(self, ensemble_data):
         """Test that parallel and sequential give equivalent results structure."""
+        from concurrent.futures import ProcessPoolExecutor
+
         n_states, n_dims, log_posterior_ens, log_pseudo_prior_ens = ensemble_data
-        
+
         # Use same seed for reproducibility
         seed = 12345
-        
+
         # Sequential results
         results_seq = run_ensemble_resampler(
             n_walkers=4,
@@ -188,23 +191,22 @@ class TestEnsembleResamplerParallelism:
             log_posterior_ens=log_posterior_ens,
             log_pseudo_prior_ens=log_pseudo_prior_ens,
             seed=seed,
-            parallel=False,
             progress=False
         )
-        
+
         # Parallel results
-        results_par = run_ensemble_resampler(
-            n_walkers=4,
-            n_steps=50,
-            n_states=n_states,
-            n_dims=n_dims,
-            log_posterior_ens=log_posterior_ens,
-            log_pseudo_prior_ens=log_pseudo_prior_ens,
-            seed=seed,
-            parallel=True,
-            n_processors=2,
-            progress=False
-        )
+        with ProcessPoolExecutor(max_workers=2) as walker_pool:
+            results_par = run_ensemble_resampler(
+                n_walkers=4,
+                n_steps=50,
+                n_states=n_states,
+                n_dims=n_dims,
+                log_posterior_ens=log_posterior_ens,
+                log_pseudo_prior_ens=log_pseudo_prior_ens,
+                seed=seed,
+                walker_pool=walker_pool,
+                progress=False
+            )
         
         # Results should have same structure
         assert results_seq.n_walkers == results_par.n_walkers

@@ -220,10 +220,9 @@ def run_product_space_sampler(
     log_posterior: MultiStateDensity,
     log_pseudo_prior: MultiStateDensity,
     seed: int | None = 61254557,
-    parallel: bool = False,
-    n_processors: int = 1,
     progress: bool = False,
     pool: Any | None = None,
+    forward_pool: Any | None = None,
     **kwargs,
 ) -> MultiWalkerProductSpaceChain:
     """Run MCMC sampler over independent states using emcee in trans-C product space.
@@ -254,17 +253,19 @@ def run_product_space_sampler(
         Note: Must be normalized over respective state spaces.
     seed : int, optional
         Random number seed for reproducible results. Default is 61254557.
-    parallel : bool, optional
-        Whether to use multiprocessing to parallelize over walkers. Default is False.
-    n_processors : int, optional
-        Number of processors to use if parallel=True. Default is 1.
     progress : bool, optional
         Whether to display progress information. Default is False.
     pool : Any | None, optional
-        User-provided pool for parallel processing. If provided, this takes
-        precedence over the parallel and n_processors parameters. The pool
-        must implement a map() method compatible with the standard library's
-        map() function. Default is None.
+        User-provided pool for parallel processing. The pool must implement
+        a map() method compatible with the standard library's map() function.
+        Default is None.
+    forward_pool : Any | None, optional
+        User-provided pool for parallelizing forward solver calls within
+        log_posterior evaluations. If provided, the pool will be made available
+        to log_posterior functions via get_forward_pool() from pytransc.utils.forward_context.
+        The pool must implement a map() method compatible with the standard library's 
+        map() function. Supports ProcessPoolExecutor, ThreadPoolExecutor, 
+        and schwimmbad pools. Default is None.
     **kwargs
         Additional keyword arguments passed to the emcee sampler.
 
@@ -309,9 +310,30 @@ def run_product_space_sampler(
     ...         log_pseudo_prior=my_log_pseudo_prior,
     ...         pool=pool
     ...     )
+
+    Using with forward pool for parallel forward solver calls:
+
+    >>> from concurrent.futures import ProcessPoolExecutor
+    >>> with ProcessPoolExecutor(max_workers=4) as forward_pool:
+    ...     results = run_product_space_sampler(
+    ...         product_space=ps,
+    ...         n_walkers=32,
+    ...         n_steps=1000,
+    ...         start_positions=start_pos,
+    ...         start_states=start_states,
+    ...         log_posterior=my_log_posterior,
+    ...         log_pseudo_prior=my_log_pseudo_prior,
+    ...         forward_pool=forward_pool
+    ...     )
     """
 
     random.seed(seed)
+
+    # Early validation of forward pool if provided
+    if forward_pool is not None:
+        from ..utils.forward_context import set_forward_pool, clear_forward_pool
+        set_forward_pool(forward_pool)  # Validates map() method
+        clear_forward_pool()  # Clear after validation
 
     if progress:
         print("\nRunning product space trans-C sampler")
@@ -328,6 +350,7 @@ def run_product_space_sampler(
         product_space=product_space,
         log_posterior=log_posterior,
         log_pseudo_prior=log_pseudo_prior,
+        forward_pool=forward_pool,
     )
 
     sampler = perform_sampling_with_emcee(
@@ -336,8 +359,6 @@ def run_product_space_sampler(
         n_steps=n_steps,
         initial_state=pos_ps,
         pool=pool,
-        parallel=parallel,
-        n_processors=n_processors,
         progress=progress,
         **kwargs,
     )
@@ -350,6 +371,7 @@ def product_space_log_prob(
     product_space: ProductSpace,
     log_posterior: MultiStateDensity,
     log_pseudo_prior: MultiStateDensity,
+    forward_pool=None,
 ):
     """
     Calculate the combined target density for product space vector i.e. sum of log posterior + log pseudo prior density of all other states.
@@ -372,8 +394,23 @@ def product_space_log_prob(
     if x[0] < -0.5 or x[0] >= product_space.n_states - 0.5:
         return -np.inf
 
+    # Import within function to avoid circular imports
+    from ..utils.forward_context import set_forward_pool, clear_forward_pool
+
     state, m = product_space.product_space2model_vectors(x)
-    log_prob = log_posterior(m[state], state)
+    
+    try:
+        # Set forward pool before log_posterior call
+        if forward_pool is not None:
+            set_forward_pool(forward_pool)
+        
+        log_prob = log_posterior(m[state], state)
+        
+    finally:
+        # Always clean up after call
+        if forward_pool is not None:
+            clear_forward_pool()
+    
     for i in range(product_space.n_states):
         if i != state:
             new = log_pseudo_prior(m[i], i)

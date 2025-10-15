@@ -9,15 +9,88 @@ from typing import Any
 
 import numpy as np
 
-# Set multiprocessing start method to fork to avoid pickling issues
-try:
-    multiprocessing.set_start_method('fork', force=True)
-except RuntimeError:
-    # Already set, ignore
-    pass
-
 from ..utils.types import FloatArray, MultiStateDensity
 from ._emcee import perform_sampling_with_emcee
+
+
+# Global process-level forward pool cache to prevent thrashing
+_process_forward_pool = None
+_process_forward_pool_config = None
+
+class LogPosteriorWithForwardPool:
+    """Picklable wrapper for log_posterior that manages forward pool.
+    
+    This class allows the log_posterior function to be pickled for use
+    with emcee's pool (walker-level parallelism) while still supporting
+    forward pool functionality.
+    
+    Uses a process-level pool cache to prevent pool creation/destruction thrashing.
+    """
+    
+    def __init__(self, log_posterior, forward_pool_config=None):
+        """Initialize the wrapper.
+        
+        Parameters
+        ----------
+        log_posterior : callable
+            The original log posterior function.
+        forward_pool_config : dict or None
+            Configuration for creating forward pool in worker processes.
+        """
+        self.log_posterior = log_posterior
+        self.forward_pool_config = forward_pool_config
+        
+    def __call__(self, params):
+        """Evaluate log posterior with forward pool context."""
+        from ..utils.forward_context import set_forward_pool, clear_forward_pool
+        import os
+        global _process_forward_pool, _process_forward_pool_config
+        
+        # Create forward pool at process level if needed (prevents thrashing)
+        if (self.forward_pool_config is not None and 
+            (_process_forward_pool is None or _process_forward_pool_config != self.forward_pool_config)):
+            
+            # Clean up old pool if config changed
+            if _process_forward_pool is not None and _process_forward_pool_config != self.forward_pool_config:
+                _process_forward_pool.shutdown(wait=True)
+                _process_forward_pool = None
+            
+            pool_type = self.forward_pool_config['type']
+            pool_kwargs = self.forward_pool_config.get('kwargs', {})
+            
+            if pool_type == 'ProcessPoolExecutor':
+                from concurrent.futures import ProcessPoolExecutor
+                _process_forward_pool = ProcessPoolExecutor(**pool_kwargs)
+            elif pool_type == 'ThreadPoolExecutor':
+                from concurrent.futures import ThreadPoolExecutor
+                _process_forward_pool = ThreadPoolExecutor(**pool_kwargs)
+                
+            _process_forward_pool_config = self.forward_pool_config.copy()
+        
+        # Set forward pool in context if available
+        if _process_forward_pool is not None:
+            set_forward_pool(_process_forward_pool)
+            try:
+                result = self.log_posterior(params)
+            finally:
+                clear_forward_pool()
+        else:
+            result = self.log_posterior(params)
+            
+        return result
+    
+    def __del__(self):
+        """Clean up forward pool on deletion."""
+        # No longer managing instance-level pools - cleanup handled at process level
+        pass
+    
+    def cleanup(self):
+        """Explicitly clean up the forward pool."""
+        global _process_forward_pool, _process_forward_pool_config
+        if _process_forward_pool is not None:
+            _process_forward_pool.shutdown(wait=True)
+            _process_forward_pool = None
+            _process_forward_pool_config = None
 
 
 def run_mcmc_per_state(
@@ -33,11 +106,10 @@ def run_mcmc_per_state(
     seed: int = 61254557,
     state_pool: Any | None = None,
     emcee_pool: Any | None = None,
-    parallel: bool | list[bool] = False,
-    n_processors: int = 1,
     n_state_processors: int | None = None,
     skip_initial_state_check: bool = False,
     verbose: bool = True,
+    forward_pool: Any | None = None,
     **kwargs,
 ) -> tuple[list[FloatArray], list[FloatArray]]:
     """Run independent MCMC sampling within each state.
@@ -75,20 +147,25 @@ def run_mcmc_per_state(
         ignoring the `thin` parameter. Default is False.
     seed : int, optional
         Random number seed for reproducible results. Default is 61254557.
-    parallel : bool or list of bool, optional
-        Whether to use multiprocessing for parallel sampling. If bool, same
-        setting used for all states. Default is False.
-    n_processors : int, optional
-        Number of processors to use if parallel=True. Default is 1.
     skip_initial_state_check : bool, optional
         Whether to skip emcee's initial state check. Default is False.
     verbose : bool, optional
         Whether to print progress information. Default is True.
-    pool : Any | None, optional
-        User-provided pool for parallel processing. If provided, this takes
-        precedence over the parallel and n_processors parameters. The pool
-        must implement a map() method compatible with the standard library's
+    state_pool : Any | None, optional
+        User-provided pool for parallelizing state execution. If provided, states
+        are processed in parallel. The pool must implement a map() method compatible
+        with the standard library's map() function. Default is None.
+    emcee_pool : Any | None, optional
+        User-provided pool for parallelizing emcee walker execution within each state.
+        The pool must implement a map() method compatible with the standard library's
         map() function. Default is None.
+    forward_pool : Any | None, optional
+        User-provided pool for parallelizing forward solver calls within
+        log_posterior evaluations. If provided, the pool will be made available
+        to log_posterior functions via get_forward_pool() from pytransc.utils.forward_context.
+        The pool must implement a map() method compatible with the standard library's 
+        map() function. Supports ProcessPoolExecutor, ThreadPoolExecutor, 
+        and schwimmbad pools. Default is None.
     **kwargs
         Additional keyword arguments passed to emcee.EnsembleSampler.
 
@@ -157,9 +234,30 @@ def run_mcmc_per_state(
     ...         state_pool=state_pool,
     ...         emcee_pool=emcee_pool
     ...     )
+
+    Using with forward pool for parallel forward solver calls:
+
+    >>> from concurrent.futures import ProcessPoolExecutor
+    >>> with ProcessPoolExecutor(max_workers=4) as forward_pool:
+    ...     ensembles, log_probs = run_mcmc_per_state(
+    ...         n_states=3,
+    ...         n_dims=[2, 3, 1],
+    ...         n_walkers=32,
+    ...         n_steps=1000,
+    ...         pos=initial_positions,
+    ...         log_posterior=my_log_posterior,
+    ...         forward_pool=forward_pool
+    ...     )
     """
 
     random.seed(seed)
+
+    # Early validation of forward pool if provided
+    if forward_pool is not None:
+        from ..utils.forward_context import set_forward_pool, clear_forward_pool
+        set_forward_pool(forward_pool)  # Validates map() method
+        clear_forward_pool()  # Clear after validation
+
     if not isinstance(n_walkers, list):
         n_walkers = [n_walkers] * n_states
     if not isinstance(discard, list):
@@ -168,8 +266,6 @@ def run_mcmc_per_state(
         thin = [thin] * n_states
     if not isinstance(n_steps, list):
         n_steps = [n_steps] * n_states
-    if isinstance(parallel, bool):
-        parallel = [parallel] * n_states
 
     if auto_thin:
         # ignore thinning factor because we are post thinning by the auto-correlation times
@@ -185,7 +281,7 @@ def run_mcmc_per_state(
         if state_pool is not None:
             print("Using state-level parallelism")
         if emcee_pool is not None:
-            print("Using emcee-level parallelism")
+            print("Using walker-level parallelism")
 
     # Prepare emcee pool configuration to avoid pickling issues
     emcee_pool_config = None
@@ -203,6 +299,23 @@ def run_mcmc_per_state(
                     'type': 'ThreadPoolExecutor',
                     'kwargs': {'max_workers': emcee_pool._max_workers}
                 }
+    
+    # Prepare forward pool configuration to avoid pickling issues
+    forward_pool_config = None
+    if forward_pool is not None and state_pool is not None:
+        # Only create config when using state-level parallelism
+        if hasattr(forward_pool, '__class__'):
+            pool_class_name = forward_pool.__class__.__name__
+            if pool_class_name == 'ProcessPoolExecutor':
+                forward_pool_config = {
+                    'type': 'ProcessPoolExecutor',
+                    'kwargs': {'max_workers': forward_pool._max_workers}
+                }
+            elif pool_class_name == 'ThreadPoolExecutor':
+                forward_pool_config = {
+                    'type': 'ThreadPoolExecutor',
+                    'kwargs': {'max_workers': forward_pool._max_workers}
+                }
 
     # Prepare state processing arguments
     state_args = []
@@ -215,19 +328,21 @@ def run_mcmc_per_state(
             'n_steps': n_steps[i],
             'discard': discard[i],
             'thin': thin[i],
-            'parallel': parallel[i],
-            'n_processors': n_processors,
             'skip_initial_state_check': skip_initial_state_check,
             'verbose': verbose,
             **kwargs
         }
 
-        # Add emcee pool config for state-level parallelism
+        # Add pool configs for state-level parallelism
         if state_pool is not None:
             args_dict['emcee_pool_config'] = emcee_pool_config
+            if forward_pool_config is not None:
+                args_dict['forward_pool_config'] = forward_pool_config
+            # Don't pass the actual pool objects
         else:
-            # For sequential processing, pass the pool directly
+            # For sequential processing, pass the pools directly
             args_dict['emcee_pool'] = emcee_pool
+            args_dict['forward_pool'] = forward_pool
 
         state_args.append(args_dict)
 
@@ -241,11 +356,14 @@ def run_mcmc_per_state(
             results = list(executor.map(_process_single_state, state_args))
     else:
         # Sequential processing (original behavior)
-        # For sequential, we can pass emcee_pool directly since no pickling needed
+        # For sequential, we can pass pools directly since no pickling needed
         for args in state_args:
             if 'emcee_pool_config' in args:
                 del args['emcee_pool_config']
+            if 'forward_pool_config' in args:
+                del args['forward_pool_config']
             args['emcee_pool'] = emcee_pool
+            args['forward_pool'] = forward_pool
         results = [_process_single_state(args) for args in state_args]
 
     # Unpack results
@@ -268,43 +386,70 @@ def process_state(
     n_steps: int,
     discard: int = 0,
     thin: int = 1,
-    parallel: bool = False,
-    n_processors: int = 1,
     verbose: bool = True,
     pool: Any | None = None,
+    forward_pool: Any | None = None,
+    forward_pool_config: dict | None = None,
     **kwargs: Any,
 ) -> tuple[FloatArray, FloatArray, FloatArray]:
     """Get the posterior samples, log probabilities, and autocorrelation times for a single state."""
-    sampler = perform_sampling_with_emcee(
-        log_prob_func=log_posterior,
-        n_walkers=n_walkers,
-        n_steps=n_steps,
-        initial_state=pos,
-        pool=pool,
-        parallel=parallel,
-        n_processors=n_processors,
-        progress=verbose,
-        **kwargs,
-    )
-    samples = sampler.get_chain(discard=discard, thin=thin, flat=True)
-    if samples is None:
-        raise ValueError(
-            "Sampler did not return a chain. Check the log_prob function and initial state."
+    
+    # Always use the picklable wrapper when forward pool is provided
+    # This handles all parallelism scenarios cleanly
+    if forward_pool is not None or forward_pool_config is not None:
+        # Create config from pool if not provided
+        if forward_pool_config is None and forward_pool is not None:
+            if hasattr(forward_pool, '__class__'):
+                pool_class_name = forward_pool.__class__.__name__
+                if pool_class_name == 'ProcessPoolExecutor':
+                    forward_pool_config = {
+                        'type': 'ProcessPoolExecutor',
+                        'kwargs': {'max_workers': forward_pool._max_workers}
+                    }
+                elif pool_class_name == 'ThreadPoolExecutor':
+                    forward_pool_config = {
+                        'type': 'ThreadPoolExecutor',
+                        'kwargs': {'max_workers': forward_pool._max_workers}
+                    }
+        
+        # Use the wrapper for picklable log_posterior
+        log_prob_func = LogPosteriorWithForwardPool(log_posterior, forward_pool_config)
+    else:
+        log_prob_func = log_posterior
+    
+    try:
+        sampler = perform_sampling_with_emcee(
+            log_prob_func=log_prob_func,
+            n_walkers=n_walkers,
+            n_steps=n_steps,
+            initial_state=pos,
+            pool=pool,
+            progress=verbose,
+            **kwargs,
         )
+        samples = sampler.get_chain(discard=discard, thin=thin, flat=True)
+        if samples is None:
+            raise ValueError(
+                "Sampler did not return a chain. Check the log_prob function and initial state."
+            )
 
-    log_posterior_ens = sampler.get_log_prob(discard=discard, thin=thin, flat=True)
-    if log_posterior_ens is None:
-        raise ValueError(
-            "Sampler did not return log probabilities. Check the log_prob function and initial state."
-        )
+        log_posterior_ens = sampler.get_log_prob(discard=discard, thin=thin, flat=True)
+        if log_posterior_ens is None:
+            raise ValueError(
+                "Sampler did not return log probabilities. Check the log_prob function and initial state."
+            )
 
-    autocorr_time = sampler.get_autocorr_time(tol=0)
-    if autocorr_time is None:
-        raise ValueError(
-            "Sampler did not return autocorrelation times. Check the log_prob function and initial state."
-        )
+        autocorr_time = sampler.get_autocorr_time(tol=0)
+        if autocorr_time is None:
+            raise ValueError(
+                "Sampler did not return autocorrelation times. Check the log_prob function and initial state."
+            )
 
-    return samples, log_posterior_ens, autocorr_time
+        return samples, log_posterior_ens, autocorr_time
+    finally:
+        # Clean up wrapper if created
+        if hasattr(log_prob_func, 'cleanup'):
+            log_prob_func.cleanup()
 
 
 def _perform_auto_thinning(
@@ -365,13 +510,21 @@ def _process_single_state(state_args: dict) -> tuple[FloatArray, FloatArray, Flo
             from concurrent.futures import ThreadPoolExecutor
             emcee_pool = ThreadPoolExecutor(**pool_kwargs)
         # Add other pool types as needed
+    
+    # Get forward pool config and actual pool (if in sequential mode)
+    forward_pool_config = state_args.get('forward_pool_config', None)
+    forward_pool = state_args.get('forward_pool', None)  # May be passed directly in sequential mode
 
     # Create partial log posterior for this state
     _log_posterior = partial(log_posterior, state=state_idx)
 
     # Remove state-specific args from kwargs
     process_kwargs = {k: v for k, v in state_args.items()
-                     if k not in ['state_idx', 'log_posterior', 'emcee_pool_config']}
+                     if k not in ['state_idx', 'log_posterior', 'emcee_pool_config', 'forward_pool_config', 'forward_pool']}
+    
+    # Pass both forward pool and config to process_state
+    process_kwargs['forward_pool'] = forward_pool
+    process_kwargs['forward_pool_config'] = forward_pool_config
 
     try:
         result = process_state(

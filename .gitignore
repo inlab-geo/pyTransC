@@ -1,6 +1,7 @@
 # Editor temporary/working/backup files #
 #########################################
 *.swp
+.vscode
 
 # Compiled source #
 ###################
@@ -47,3 +48,12 @@ MANIFEST
 # OS generated files #
 ######################
 .DS_Store*
+
+# Notebook auto-generated function files #
+##########################################
+# Files created by %%writefile magic commands in example notebooks
+# These are generated for cross-platform multiprocessing compatibility
+examples/**/gaussians_functions.py
+examples/**/regression_functions.py
+examples/**/tomography_functions.py
+examples/**/gravity_functions.py

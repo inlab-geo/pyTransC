@@ -253,27 +253,6 @@ class TestWalkerParallelism:
         assert len(samples) == n_states
         assert len(log_probs) == n_states
 
-    def test_legacy_parallel_parameter(self, basic_problem):
-        """Test legacy parallel=True parameter."""
-        n_states, n_dims, n_walkers, n_steps, pos = basic_problem
-        
-        samples, log_probs = run_mcmc_per_state(
-            n_states=n_states,
-            n_dims=n_dims,
-            n_walkers=n_walkers,
-            n_steps=n_steps,
-            pos=pos,
-            log_posterior=simple_log_posterior,
-            parallel=True,
-            n_processors=2,
-            verbose=False
-        )
-        
-        # Validate results
-        assert len(samples) == n_states
-        assert len(log_probs) == n_states
-
-
 class TestTwoLevelParallelism:
     """Test combined state and walker parallelism."""
 
@@ -411,37 +390,15 @@ class TestBackwardCompatibility:
     def test_original_api_unchanged(self, basic_problem):
         """Test that original API calls still work unchanged."""
         n_states, n_dims, n_walkers, n_steps, pos = basic_problem
-        
+
         # Original API call should work exactly as before
         samples, log_probs = run_mcmc_per_state(
             n_states, n_dims, n_walkers, n_steps, pos, simple_log_posterior,
-            discard=0, thin=1, auto_thin=False, seed=42, parallel=False,
-            n_processors=1, verbose=False
+            discard=0, thin=1, auto_thin=False, seed=42, verbose=False
         )
-        
+
         assert len(samples) == n_states
         assert len(log_probs) == n_states
-
-    def test_mixed_old_new_parameters(self, basic_problem):
-        """Test mixing old and new parameters."""
-        n_states, n_dims, n_walkers, n_steps, pos = basic_problem
-        
-        # Mix legacy parallel=True with new state_pool
-        with ProcessPoolExecutor(max_workers=2) as state_pool:
-            samples, log_probs = run_mcmc_per_state(
-                n_states=n_states,
-                n_dims=n_dims,
-                n_walkers=n_walkers,
-                n_steps=n_steps,
-                pos=pos,
-                log_posterior=simple_log_posterior,
-                state_pool=state_pool,
-                parallel=True,  # Legacy parameter
-                n_processors=2,  # Legacy parameter
-                verbose=False
-            )
-        
-        assert len(samples) == n_states
 
 
 @pytest.mark.skipif(
