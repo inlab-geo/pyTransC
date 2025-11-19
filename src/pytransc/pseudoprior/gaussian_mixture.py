@@ -71,7 +71,7 @@ def build_gaussian_mixture_pseudo_prior(
         **kwargs: Additional keyword arguments for Gaussian mixture fitting.
 
     Returns:
-        list[GaussianMixture]: List of fitted Gaussian mixture models for each state.
+        GaussianMixturePseudoPrior: Pseudo-prior object wrapping fitted Gaussian mixture models for each state.
     """
     standardize = kwargs.pop("standardize", False)
     cls = StandardGaussianMixture if standardize else GaussianMixture
