@@ -3,6 +3,7 @@
 from enum import StrEnum, auto
 from typing import Any, Protocol
 
+from ..utils.exceptions import InputError
 from ..utils.types import (
     FloatArray,
     SampleableMultiStateDensity,
@@ -15,7 +16,6 @@ class PseudoPriorBuilders(StrEnum):
     """Enum for available pseudo-prior builders."""
 
     GAUSSIAN_MIXTURE = auto()
-    GAUSSIAN_MIXTURE_STANDARDIZED = auto()
     MEAN_COVARIANCE = auto()
 
 
@@ -49,7 +49,7 @@ pseudo_prior_factories: dict[PseudoPriorBuilders, PseudoPriorBuilder] = {
 
 def build_auto_pseudo_prior(
     ensemble_per_state: list[FloatArray],
-    pseudo_prior_type: PseudoPriorBuilders = PseudoPriorBuilders.GAUSSIAN_MIXTURE_STANDARDIZED,
+    pseudo_prior_type: PseudoPriorBuilders = PseudoPriorBuilders.GAUSSIAN_MIXTURE,
     **builder_kwargs,
 ):
     """
@@ -66,9 +66,8 @@ def build_auto_pseudo_prior(
         Generate these samples using run_mcmc_per_state() or provide pre-existing
         posterior ensembles.
     pseudo_prior_type : PseudoPriorBuilders, optional
-        Type of pseudo-prior builder to use. Default is GAUSSIAN_MIXTURE_STANDARDIZED.
+        Type of pseudo-prior builder to use. Default is GAUSSIAN_MIXTURE.
         Options include:
-        - GAUSSIAN_MIXTURE_STANDARDIZED: GMM with standardization (recommended)
         - GAUSSIAN_MIXTURE: Standard GMM without standardization
         - MEAN_COVARIANCE: Simple Gaussian approximation
     **builder_kwargs : dict
@@ -130,6 +129,10 @@ def build_auto_pseudo_prior(
             "      ensemble_per_state=ensemble_per_state\n"
             "  )"
         )
+    try:
+        pseudo_prior_type = PseudoPriorBuilders(pseudo_prior_type)
+    except ValueError as e:
+        raise InputError(f"Invalid pseudo_prior_type: {pseudo_prior_type}") from e
 
     log_pseudo_prior = pseudo_prior_factories[pseudo_prior_type](
         ensemble_per_state, **builder_kwargs
