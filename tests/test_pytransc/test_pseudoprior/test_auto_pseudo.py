@@ -1,6 +1,5 @@
 """Testing the user-facing auto build function for pseudo-priors."""
 
-from unittest.mock import patch
 
 import numpy as np
 import pytest
