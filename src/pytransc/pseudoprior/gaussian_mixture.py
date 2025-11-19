@@ -44,10 +44,8 @@ class GaussianMixturePseudoPrior:
 
         Parameters
         ----------
-        ensemble_per_state : list of FloatArray
-            List of ensembles for each state.
-        kwargs : dict
-            Additional arguments for Gaussian mixture fitting.
+        gaussian_mixtures : list of GaussianMixture
+            List of fitted GaussianMixture models, one for each state.
         """
         self.gaussian_mixtures = gaussian_mixtures
 
