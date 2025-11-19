@@ -138,7 +138,6 @@ from mpi4py import MPI
 # pyTransC imports
 from pytransc.samplers import run_mcmc_per_state, run_ensemble_resampler
 from pytransc.utils.types import FloatArray
-from pytransc.pseudoprior import build_auto_pseudo_prior
 from pytransc.analysis.visits import get_visits_to_states
 
 
