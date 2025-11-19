@@ -92,8 +92,8 @@ def build_auto_pseudo_prior(
     >>> # Build pseudo-prior from ensembles
     >>> pseudo_prior = build_auto_pseudo_prior(
     ...     ensemble_per_state=ensemble_per_state,
-    ...     pseudo_prior_type=PseudoPriorBuilders.GAUSSIAN_MIXTURE_STANDARDIZED,
-    ...     n_components=3, covariance_type='full'
+    ...     pseudo_prior_type=PseudoPriorBuilders.GAUSSIAN_MIXTURE,
+    ...     n_components=3, covariance_type='full', standardize=True
     ... )
     >>>
     >>> # Use in trans-conceptual sampler
