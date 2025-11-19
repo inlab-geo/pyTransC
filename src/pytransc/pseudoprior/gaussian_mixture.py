@@ -13,6 +13,8 @@ class StandardGaussianMixture(GaussianMixture):
 
     def fit(self, X: FloatArray, y: Any = None) -> "StandardGaussianMixture":
         """Fit the Gaussian mixture to standardized data."""
+        self.mean = np.mean(X, axis=0)
+        self.std = np.std(X, axis=0)
         X_std = self._standardize_samples(X)
         return super().fit(X_std)
 
@@ -29,8 +31,6 @@ class StandardGaussianMixture(GaussianMixture):
 
     def _standardize_samples(self, X: FloatArray) -> FloatArray:
         """Standardize samples."""
-        self.mean = np.mean(X, axis=0)
-        self.std = np.std(X, axis=0)
         return (X - self.mean) / self.std
 
 
