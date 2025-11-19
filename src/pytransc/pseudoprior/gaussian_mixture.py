@@ -4,7 +4,6 @@ from typing import Any
 
 import numpy as np
 from sklearn.mixture import GaussianMixture
-from traitlets import Float
 
 from ..utils.types import FloatArray
 
@@ -22,7 +21,7 @@ class StandardGaussianMixture(GaussianMixture):
         samples, labels = super().sample(n_samples=n_samples)
         return samples * self.std + self.mean, labels
 
-    def score_samples(self, X: FloatArray) -> Float:
+    def score_samples(self, X: FloatArray) -> float:
         """Evaluate the log density of the samples after standardizing them."""
         X_std = self._standardize_samples(X)
         log_density_correction = np.sum(np.log(self.std))
