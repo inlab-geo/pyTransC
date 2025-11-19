@@ -1,7 +1,6 @@
 """Testing the user-facing auto build function for pseudo-priors."""
 
 
-import numpy as np
 import pytest
 
 from pytransc.pseudoprior import build_auto_pseudo_prior
