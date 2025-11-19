@@ -1,4 +1,8 @@
-"""Tests for the Gaussian Mixture pseudo-prior."""
+"""Tests for the Gaussian Mixture pseudo-prior.
+
+Tests the fitting, log density evaluation, and sampling of the
+Gaussian Mixture pseudo-prior.
+"""
 
 import numpy as np
 import pytest
@@ -6,6 +10,7 @@ from sklearn.mixture import GaussianMixture
 
 from pytransc.pseudoprior.gaussian_mixture import (
     GaussianMixturePseudoPrior,
+    StandardGaussianMixture,
     build_gaussian_mixture_pseudo_prior,
 )
 from pytransc.utils.types import FloatArray
@@ -43,6 +48,27 @@ def test_gaussian_mixture_pseudo_prior(ensemble_per_state: list[FloatArray]) -> 
         assert isinstance(gmm, GaussianMixture)
         assert np.isclose(gmm.means_[0], np.mean(ensemble))
         assert np.isclose(gmm.covariances_[0], np.var(ensemble))
+
+
+def test_standardized_gaussian_mixture_pseudo_prior(
+    ensemble_per_state: list[FloatArray],
+) -> None:
+    """Test the standardized Gaussian Mixture pseudo-prior.
+
+    Check that the `.means_` and `.covariances_` are 0 and 1, respectively, and that the original mean and variance are stored.
+    """
+    gm_pseudo = build_gaussian_mixture_pseudo_prior(
+        ensemble_per_state, standardize=True
+    )
+    for gmm, ensemble in zip(gm_pseudo.gaussian_mixtures, ensemble_per_state):
+        assert isinstance(gmm, StandardGaussianMixture)
+        assert np.isclose(gmm.means_[0], 0.0)
+        assert np.isclose(gmm.covariances_[0], 1.0)
+
+        # Slightly confusing naming: gmm.mean and gmm.std store the original mean and std
+        # whereas gmm.means_ and gmm.covariances_ are the standardized ones
+        assert np.isclose(gmm.mean, np.mean(ensemble))
+        assert np.isclose(gmm.std, np.std(ensemble))
 
 
 def test_gaussian_mixture_pseudo_prior_log_density(
