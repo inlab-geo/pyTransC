@@ -119,7 +119,8 @@ Usage:
 import sys
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')  # Non-interactive backend for saving figures
+
+matplotlib.use("Agg")  # Non-interactive backend for saving figures
 import matplotlib.pyplot as plt
 import pyfm2d
 import time
@@ -137,7 +138,6 @@ from mpi4py import MPI
 # pyTransC imports
 from pytransc.samplers import run_mcmc_per_state, run_ensemble_resampler
 from pytransc.utils.types import FloatArray
-from pytransc.utils.auto_pseudo import build_auto_pseudo_prior
 from pytransc.analysis.visits import get_visits_to_states
 
 
@@ -145,28 +145,29 @@ from pytransc.analysis.visits import get_visits_to_states
 # Utility routines for building seismic velocity models
 # ============================================================================
 
-def get_gauss_model(extent, nx, ny, factor=1.):
+
+def get_gauss_model(extent, nx, ny, factor=1.0):
     """Build two gaussian anomaly velocity model"""
-    vc1 = 1700*factor                           # velocity of circle 1 in m/s
-    vc2 = 2300*factor                           # velocity of circle 2 in m/s
-    vb = 2000*factor                            # background velocity
-    dx = (extent[1]-extent[0])/nx               # cell width
-    dy = (extent[3]-extent[2])/ny               # cell height
-    xc = np.linspace(extent[0], extent[1], nx)   # cell centre
-    yc = np.linspace(extent[2], extent[3], ny)   # cell centre
-    X, Y = np.meshgrid(xc, yc, indexing='ij')    # cell centre mesh
+    vc1 = 1700 * factor  # velocity of circle 1 in m/s
+    vc2 = 2300 * factor  # velocity of circle 2 in m/s
+    vb = 2000 * factor  # background velocity
+    dx = (extent[1] - extent[0]) / nx  # cell width
+    dy = (extent[3] - extent[2]) / ny  # cell height
+    xc = np.linspace(extent[0], extent[1], nx)  # cell centre
+    yc = np.linspace(extent[2], extent[3], ny)  # cell centre
+    X, Y = np.meshgrid(xc, yc, indexing="ij")  # cell centre mesh
 
     # Multivariate Normal
-    dex = extent[1]-extent[0]
-    dey = extent[3]-extent[2]
-    c1x = extent[0] + (7.0-extent[0])*dex/20.
-    c2x = extent[0] + (12.0-extent[0])*dex/20.
-    c1y = extent[0] + (22.0-extent[0])*dey/30.
-    c2y = extent[0] + (10.0-extent[0])*dey/30.
-    s1 = 6.0*dex/20.
-    s2 = 10.0*dex/20.
-    c1, sig1 = np.array([c1x, c1y])*factor, s1*(factor**2)
-    c2, sig2 = np.array([c2x, c2y])*factor, s2*(factor**2)
+    dex = extent[1] - extent[0]
+    dey = extent[3] - extent[2]
+    c1x = extent[0] + (7.0 - extent[0]) * dex / 20.0
+    c2x = extent[0] + (12.0 - extent[0]) * dex / 20.0
+    c1y = extent[0] + (22.0 - extent[0]) * dey / 30.0
+    c2y = extent[0] + (10.0 - extent[0]) * dey / 30.0
+    s1 = 6.0 * dex / 20.0
+    s2 = 10.0 * dex / 20.0
+    c1, sig1 = np.array([c1x, c1y]) * factor, s1 * (factor**2)
+    c2, sig2 = np.array([c2x, c2y]) * factor, s2 * (factor**2)
     rv1 = multivariate_normal(c1, [[sig1, 0], [0, sig1]])
     rv2 = multivariate_normal(c2, [[sig2, 0], [0, sig2]])
 
@@ -175,10 +176,16 @@ def get_gauss_model(extent, nx, ny, factor=1.):
     pos[:, :, 0] = X
     pos[:, :, 1] = Y
     gauss1, gauss2 = rv1.pdf(pos), rv2.pdf(pos)
-    return vb*np.ones([nx, ny]) + (vc1-vb)*gauss1/np.max(gauss1) + (vc2-vb)*gauss2/np.max(gauss2)
+    return (
+        vb * np.ones([nx, ny])
+        + (vc1 - vb) * gauss1 / np.max(gauss1)
+        + (vc2 - vb) * gauss2 / np.max(gauss2)
+    )
 
 
-def generate_covariance_matrix_inv(model_shape: tuple, corr_lengths: tuple, sigma: float):
+def generate_covariance_matrix_inv(
+    model_shape: tuple, corr_lengths: tuple, sigma: float
+):
     """Gaussian inverse covariance matrix implementation from Juerg Hauser"""
     # ensure model_shape and corr_lengths have the same length
     if len(model_shape) != len(corr_lengths):
@@ -216,7 +223,7 @@ rank = comm.Get_rank()
 size = comm.Get_size()
 
 # Only master process prints and creates figures
-is_master = (rank == 0)
+is_master = rank == 0
 
 # ============================================================================
 # Build high resolution reference velocity model and calculate travel times
@@ -232,7 +239,7 @@ velocity = gtrue.get_velocity()
 if is_master:
     fig = plt.figure(figsize=(6, 6))
     pyfm2d.display_model(velocity, extent=extent, figsize=(6, 6), clim=(1700, 2300))
-    plt.savefig('reference_velocity_model.png', dpi=150, bbox_inches='tight')
+    plt.savefig("reference_velocity_model.png", dpi=150, bbox_inches="tight")
     plt.close()
     print("Saved: reference_velocity_model.png")
 
@@ -275,7 +282,7 @@ if is_master:
         srcs=srcs,
         alpha=0.1,
     )
-    plt.savefig('velocity_model_with_raypaths.png', dpi=150, bbox_inches='tight')
+    plt.savefig("velocity_model_with_raypaths.png", dpi=150, bbox_inches="tight")
     plt.close()
     print("Saved: velocity_model_with_raypaths.png")
 
@@ -283,11 +290,13 @@ if is_master:
 sigma = 0.0001
 np.random.seed(61254557)
 ttrue = result.ttimes
-tobs = ttrue + sigma*np.random.randn(len(ttrue))
+tobs = ttrue + sigma * np.random.randn(len(ttrue))
 if is_master:
-    print(f'Noise is {sigma/np.std(ttrue)*100:.2f}% of travel times standard deviation')
-Cdinv = np.eye(len(tobs))/(sigma**2)
-Cd = np.eye(len(tobs))*sigma**2
+    print(
+        f"Noise is {sigma / np.std(ttrue) * 100:.2f}% of travel times standard deviation"
+    )
+Cdinv = np.eye(len(tobs)) / (sigma**2)
+Cd = np.eye(len(tobs)) * sigma**2
 
 
 # ============================================================================
@@ -299,43 +308,59 @@ if is_master:
 stateparams = {}
 nstates = 4
 
-stateparams['nx'] = [7, 6, 5, 4]
-stateparams['ny'] = [9, 8, 7, 6]
+stateparams["nx"] = [7, 6, 5, 4]
+stateparams["ny"] = [9, 8, 7, 6]
 corrkm = 2
-stateparams['corrx'] = [1, 1, 1, 1]
-stateparams['corry'] = [1, 1, 1, 1]
-sigma_slowness = 2.5E-6
+stateparams["corrx"] = [1, 1, 1, 1]
+stateparams["corry"] = [1, 1, 1, 1]
+sigma_slowness = 2.5e-6
 
-Cm_inv, Cm, sref, rvs, gs, corrxl, corryl = [None] * nstates, [None] * nstates, [None] * nstates, [None] * nstates, [None] * nstates, [None] * nstates, [None] * nstates
+Cm_inv, Cm, sref, rvs, gs, corrxl, corryl = (
+    [None] * nstates,
+    [None] * nstates,
+    [None] * nstates,
+    [None] * nstates,
+    [None] * nstates,
+    [None] * nstates,
+    [None] * nstates,
+)
 
 for state in range(nstates):
-    nx, ny = stateparams['nx'][state], stateparams['ny'][state]
-    corrx = corrkm*nx/(extent[1]-extent[0])
-    corry = corrkm*ny/(extent[3]-extent[2])
-    Cm_inv[state], Cm[state] = generate_covariance_matrix_inv((nx, ny), (corrx, corry), sigma_slowness)
+    nx, ny = stateparams["nx"][state], stateparams["ny"][state]
+    corrx = corrkm * nx / (extent[1] - extent[0])
+    corry = corrkm * ny / (extent[3] - extent[2])
+    Cm_inv[state], Cm[state] = generate_covariance_matrix_inv(
+        (nx, ny), (corrx, corry), sigma_slowness
+    )
     gs[state] = pyfm2d.BasisModel(get_gauss_model(extent, nx, ny), extent=extent)
-    sref[state] = np.ones([nx, ny]).flatten()/2000.
-    Cm[state] = sigma_slowness*np.eye(nx*ny)
+    sref[state] = np.ones([nx, ny]).flatten() / 2000.0
+    Cm[state] = sigma_slowness * np.eye(nx * ny)
     rvs[state] = stats.multivariate_normal(mean=sref[state], cov=Cm[state])
     corrxl[state] = corrx
     corryl[state] = corry
 
-stateparams['Cm'] = Cm
-stateparams['Cm_inv'] = Cm_inv
-stateparams['sref'] = sref
-stateparams['g'] = gs
-stateparams['rv'] = rvs
-stateparams['corrx'][state] = corrxl
-stateparams['corry'][state] = corryl
+stateparams["Cm"] = Cm
+stateparams["Cm_inv"] = Cm_inv
+stateparams["sref"] = sref
+stateparams["g"] = gs
+stateparams["rv"] = rvs
+stateparams["corrx"][state] = corrxl
+stateparams["corry"][state] = corryl
 
 # Plot the true model projected onto the parameterization in each state
 if is_master:
     fig, axes_2d = plt.subplots(2, 2, figsize=(12, 12))
     axes = axes_2d.flatten()
     for state in range(nstates):
-        g = stateparams['g'][state]
-        pyfm2d.display_model(g.get_velocity(), extent=extent, ax=axes[state], clim=(1700, 2300), diced=False)
-    plt.savefig('true_model_all_states.png', dpi=150, bbox_inches='tight')
+        g = stateparams["g"][state]
+        pyfm2d.display_model(
+            g.get_velocity(),
+            extent=extent,
+            ax=axes[state],
+            clim=(1700, 2300),
+            diced=False,
+        )
+    plt.savefig("true_model_all_states.png", dpi=150, bbox_inches="tight")
     plt.close()
     print("Saved: true_model_all_states.png")
 
@@ -344,22 +369,36 @@ if is_master:
 # Log Likelihood and prior for each state
 # ============================================================================
 
+
 def _log_prior(x, state, stateparams):
-    rv = stateparams['rv'][state]
+    rv = stateparams["rv"][state]
     return rv.logpdf(x)
+
 
 log_prior = partial(_log_prior, stateparams=stateparams)
 
 
 def _log_likelihood(x, state, tobs, Cdinv, recs, srcs, extent, options, stateparams):
-    nx, ny = stateparams['nx'][state], stateparams['ny'][state]
-    velocity = 1./x.reshape((nx, ny))
-    result = pyfm2d.calc_wavefronts(velocity, recs, srcs, extent=extent, options=options)
+    nx, ny = stateparams["nx"][state], stateparams["ny"][state]
+    velocity = 1.0 / x.reshape((nx, ny))
+    result = pyfm2d.calc_wavefronts(
+        velocity, recs, srcs, extent=extent, options=options
+    )
     res = tobs - result.ttimes
     LL = -0.5 * res.T @ Cdinv @ res
     return LL
 
-log_likelihood = partial(_log_likelihood, tobs=tobs, Cdinv=Cdinv, recs=recs, srcs=srcs, extent=extent, options=options, stateparams=stateparams)
+
+log_likelihood = partial(
+    _log_likelihood,
+    tobs=tobs,
+    Cdinv=Cdinv,
+    recs=recs,
+    srcs=srcs,
+    extent=extent,
+    options=options,
+    stateparams=stateparams,
+)
 
 
 def log_posterior(x, state):
@@ -368,17 +407,32 @@ def log_posterior(x, state):
     return ll + lp
 
 
-def _log_likelihood_with_forward_pool(x, state, tobs, Cdinv, recs, srcs, extent, options, stateparams):
+def _log_likelihood_with_forward_pool(
+    x, state, tobs, Cdinv, recs, srcs, extent, options, stateparams
+):
     from pytransc.utils.forward_context import get_forward_pool
+
     forward_pool = get_forward_pool()
-    nx, ny = stateparams['nx'][state], stateparams['ny'][state]
-    velocity = 1./x.reshape((nx, ny))
-    result = pyfm2d.calc_wavefronts(velocity, recs, srcs, pool=forward_pool, extent=extent, options=options)
+    nx, ny = stateparams["nx"][state], stateparams["ny"][state]
+    velocity = 1.0 / x.reshape((nx, ny))
+    result = pyfm2d.calc_wavefronts(
+        velocity, recs, srcs, pool=forward_pool, extent=extent, options=options
+    )
     res = tobs - result.ttimes
     LL = -0.5 * res.T @ Cdinv @ res
     return LL
 
-log_likelihood_with_forward_pool = partial(_log_likelihood_with_forward_pool, tobs=tobs, Cdinv=Cdinv, recs=recs, srcs=srcs, extent=extent, options=options, stateparams=stateparams)
+
+log_likelihood_with_forward_pool = partial(
+    _log_likelihood_with_forward_pool,
+    tobs=tobs,
+    Cdinv=Cdinv,
+    recs=recs,
+    srcs=srcs,
+    extent=extent,
+    options=options,
+    stateparams=stateparams,
+)
 
 
 def log_posterior_with_forward_pool(x, state):
@@ -393,22 +447,26 @@ def log_posterior_with_forward_pool(x, state):
 
 if is_master:
     print("\nGenerating starting models...")
-ndims = [stateparams['nx'][i]*stateparams['ny'][i] for i in range(nstates)]
+ndims = [stateparams["nx"][i] * stateparams["ny"][i] for i in range(nstates)]
 nwalkers = 128
 nsteps = 5
 
 pos = []
 posll = []
 for state in range(nstates):
-    nx, ny = stateparams['nx'][state], stateparams['ny'][state]
-    rv = stats.multivariate_normal(mean=np.zeros(nx*ny), cov=np.eye(nx*ny))
-    slow = 1./get_gauss_model(extent, nx, ny).flatten() + sigma_slowness*rv.rvs(size=nwalkers)
+    nx, ny = stateparams["nx"][state], stateparams["ny"][state]
+    rv = stats.multivariate_normal(mean=np.zeros(nx * ny), cov=np.eye(nx * ny))
+    slow = 1.0 / get_gauss_model(extent, nx, ny).flatten() + sigma_slowness * rv.rvs(
+        size=nwalkers
+    )
     pos.append(slow)
     lp = log_prior(slow[0], state)
     ll = log_likelihood(slow[0], state)
     lpos = log_posterior(slow[0], state)
     if is_master:
-        print(f' State {state}: log-prior {lp:.2f}, log-Likelihood {ll:.2f}, lpost {lpos:.2f}')
+        print(
+            f" State {state}: log-prior {lp:.2f}, log-Likelihood {ll:.2f}, lpost {lpos:.2f}"
+        )
     posll.append(log_likelihood(pos[state][state], state))
 
 # Plot the starting models
@@ -416,12 +474,16 @@ if is_master:
     fig, axes_2d = plt.subplots(2, 2, figsize=(12, 12))
     axes = axes_2d.flatten()
     for state in range(nstates):
-        nx, ny = stateparams['nx'][state], stateparams['ny'][state]
-        pyfm2d.display_model(1./pos[state][0].reshape((nx, ny)), extent=extent, ax=axes[state], clim=(1700, 2300))
-    plt.savefig('starting_models_all_states.png', dpi=150, bbox_inches='tight')
+        nx, ny = stateparams["nx"][state], stateparams["ny"][state]
+        pyfm2d.display_model(
+            1.0 / pos[state][0].reshape((nx, ny)),
+            extent=extent,
+            ax=axes[state],
+            clim=(1700, 2300),
+        )
+    plt.savefig("starting_models_all_states.png", dpi=150, bbox_inches="tight")
     plt.close()
     print("Saved: starting_models_all_states.png")
-
 
 
 # ============================================================================
@@ -429,9 +491,9 @@ if is_master:
 # ============================================================================
 
 if is_master:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("THREE NESTED MPI POOLS (State -> Walker -> Forward)")
-    print("="*60)
+    print("=" * 60)
     print("16 processes in nested hierarchy: 2 states × 2 walkers × 2 forward")
 
 # Verify we have exactly 16 processes
@@ -469,10 +531,11 @@ if rank == 0:
 start_time = time.time()
 
 # Create MPIPool for each level with the appropriate communicator
-with MPIPool(comm=state_comm) as state_pool, \
-     MPIPool(comm=walker_comm) as walker_pool, \
-     MPIPool(comm=forward_comm) as forward_pool:
-
+with (
+    MPIPool(comm=state_comm) as state_pool,
+    MPIPool(comm=walker_comm) as walker_pool,
+    MPIPool(comm=forward_comm) as forward_pool,
+):
     # Only the master of the top-level state_pool runs the sampling
     if not state_pool.is_master():
         state_pool.wait()
@@ -498,8 +561,8 @@ with MPIPool(comm=state_comm) as state_pool, \
 
     three_level_time = time.time() - start_time
     if is_master:
-        print(f"\nThree level parallel execution completed in {three_level_time:.2f} seconds")
+        print(
+            f"\nThree level parallel execution completed in {three_level_time:.2f} seconds"
+        )
         print(f"Sample shapes: {[ens.shape for ens in ensembles_three]}")
         print(f"Log prob shapes: {[lp.shape for lp in log_probs_three]}")
-
-
