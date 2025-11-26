@@ -51,7 +51,12 @@ class GaussianMixturePseudoPrior:
     def __call__(self, x: FloatArray, state: int) -> float:
         """Evaluate the log pseudo-prior density."""
         gmm = self.gaussian_mixtures[state]
-        return float(gmm.score(np.array([x])))
+
+        # Clumsy hack to handle one model in ensemble or many
+        if x.ndim == 1:
+            return float(gmm.score(np.array([x])))
+        else:
+            return gmm.score_samples(x)
 
     def draw_deviate(self, state: int) -> FloatArray:
         """Draw a random deviate from the pseudo-prior for a given state."""
@@ -72,7 +77,7 @@ def build_gaussian_mixture_pseudo_prior(
     Returns:
         GaussianMixturePseudoPrior: Pseudo-prior object wrapping fitted Gaussian mixture models for each state.
     """
-    standardize = kwargs.pop("standardize", False)
+    standardize = kwargs.pop("standardize", True)
     cls = StandardGaussianMixture if standardize else GaussianMixture
 
     gms = []
