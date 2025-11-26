@@ -19,6 +19,7 @@ dependencies = [
     "scikit-learn>=1.6.1",
     "scipy>=1.13.1",
     "tqdm>=4.67.1",
+    "watermark>=2.5"
 ]
 
 [build-system]

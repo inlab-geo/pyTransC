@@ -17,112 +17,129 @@ pip install git+https://github.com/inlab-geo/pytransc
 ```
 ## Documentation
 
-This package implements three separate (alternate) MCMC samplers across independent model states. They are
+This package of with a single class `TransC_Sampler` implementing three separate MCMC samplers across independent model states implemented as functions of the class
 
 `run_product_space_sampler()` - implements a fixed dimension MCMC sampler over the product space of the states, and extracts a TransC/TransD ensemble. 
 
-`run_state_jump_sampler()` - implements an RJ-MCMC style algorithm using pseudo-prior proposals and balance conditions,  and extracts a TransC/TransD ensemble. 
+`run_state_jump_sampler()` - implements an RJ-MCMC style algorithm using pseudo-prior proposals and balance conditions. 
 
-`run_ensemble_resampler()` - implements a single parameter Metropolis sampler over the state indicator variable,  and extracts a TransC/TransD ensemble. Requires posterior ensembles in each state to be precomputed.
+`run_ensemble_resampler()` - implements a single parameter Metropolis sampler over the state indicator variable. Requires posterior ensembles in each state to be precomputed.
 
 Other utility functions include:
 
-`run_mcmc_per_state()` - performs MCMC sampling within each state. Can be used in conjunction with `run_ensemble_resampler()` or as the basis of build a pseudo prior PDF.
+`run_mcmc_per_state()` - performs MCMC sampling within each state.
 
 `build_auto_pseudo_prior()` - fits a mixture model to posterior ensembles in each state to act as a pseudo-prior function.
 
-`get_transc_samples()` - creates posterior TransC/TransD ensemble from results of any sampler.
-
-See the original paper above for further details.
+`get_transc_samples()` - creates posterior TransC/TransD ensemble from results of any sample.
 
 Here is the docstring of the function `run_state_jump_sampler()`:
 
-       """
-       Run MCMC sampler with direct jumps between states of different states.
+    """Run MCMC sampler over independent states using pre-computed ensembles.
 
-    		This function implements trans-conceptual MCMC using a Metropolis-Hastings
-    		algorithm that can propose jumps between states with different numbers of
-    		parameters. Between-state moves use the pseudo-prior as the proposal, while
-    		within-state moves use a user-defined proposal function.
+    This function performs trans-conceptual MCMC by resampling from pre-computed
+    posterior ensembles in each state. It calculates relative evidence of each state
+    by sampling over the ensemble members according to their posterior and pseudo-prior
+    densities.
 
-    	Parameters
-    	----------
-    	n_walkers : int
-      		 Number of random walkers used by the state jump sampler.
-    	n_steps : int
-     		 Number of MCMC steps required per walker.
-    	n_states : int
-       	 Number of independent states in the problem.
-   		n_dims : list of int
-        	 List of parameter dimensions for each state.
-    	start_positions : list of FloatArray
-        	 Starting parameter positions for each walker. Each array should contain
-        	 the initial parameter values for the corresponding starting state.
-    	start_states : list of int
-        	Starting state indices for each walker.
-    	log_posterior : MultiStateDensity
-      	  	Function to evaluate the log-posterior density at location x in state i.
-        	Must have signature log_posterior(x, state) -> float.
-    	log_pseudo_prior : SampleableMultiStateDensity
-        	Object with methods:
-        	- __call__(x, state) -> float: evaluate log pseudo-prior at x for state
-        	- draw_deviate(state) -> FloatArray: sample from pseudo-prior for state
-        Note: Must be normalized over respective state spaces.
-    	log_proposal : ProposableMultiStateDensity
-        	Object with methods:
-        	- propose(x_current, state) -> FloatArray: propose new x in state
-        	- __call__(x, state) -> float: log proposal probability (for MH ratio)
-    	prob_state : float, optional
-        	Probability of proposing a state change per MCMC step. Otherwise,
-        	a parameter change within the current state is proposed. Default is 0.1.
-    	seed : int, optional
-        	Random number seed for reproducible results. Default is 61254557.
-    	parallel : bool, optional
-        	Whether to use multiprocessing to parallelize over walkers. Default is False.
-    	n_processors : int, optional
-        	Number of processors to use if parallel=True. Default is 1.
-    	progress : bool, optional
-        	Whether to display progress information. Default is False.
-    	walker_pool : Any | None, optional
-        	User-provided pool for parallelizing walker execution. If provided, this takes
-        	precedence over the parallel and n_processors parameters for walker-level
-        	parallelism. The pool must implement a map() method compatible with the
-        	standard library's map() function. Default is None.
+    Parameters
+    ----------
+    n_walkers : int
+        Number of random walkers used by the ensemble resampler.
+    n_steps : int
+        Number of Markov chain steps to perform per walker.
+    n_states : int
+        Number of independent states in the problem.
+    n_dims : list of int
+        List of parameter dimensions for each state.
+    log_posterior_ens : StateOrderedEnsemble
+        Log-posterior values of ensemble members in each state.
+        Format: list of arrays, where each array contains log-posterior values
+        for the ensemble members in that state.
+    log_pseudo_prior_ens : StateOrderedEnsemble
+        Log-pseudo-prior values of ensemble members in each state.
+        Format: list of arrays, where each array contains log-pseudo-prior values
+        for the ensemble members in that state.
+    seed : int, optional
+        Random number seed for reproducible results. Default is 61254557.
+    state_proposal_weights : list of list of float, optional
+        Weights for proposing transitions between states. Should be a matrix
+        where element [i][j] is the weight for proposing state j from state i.
+        Diagonal elements are ignored. If None, uniform weights are used.
+    progress : bool, optional
+        Whether to display progress information. Default is False.
+    walker_pool : Any | None, optional
+        User-provided pool for parallelizing walker execution. The pool must
+        implement a map() method compatible with the standard library's map()
+        function. Default is None.
+    state_pool : Any | None, optional
+        User-provided pool for parallelizing state-level operations such as
+        pseudo-prior evaluation across states. Currently reserved for future
+        enhancements. Default is None.
+    forward_pool : Any | None, optional
+        User-provided pool for parallelizing forward solver calls within
+        log_posterior evaluations. If provided, the pool will be made available
+        to log_posterior functions via get_forward_pool() from pytransc.utils.forward_context.
+        The pool must implement a map() method compatible with the standard library's 
+        map() function. Supports ProcessPoolExecutor, ThreadPoolExecutor, 
+        and schwimmbad pools. Default is None.
 
-    	Returns
-    	-------
-    	MultiWalkerStateJumpChain
-        	Chain results containing state sequences, model parameters, proposal
-        	acceptance rates, and diagnostics for all walkers.
+    Returns
+    -------
+    MultiWalkerEnsembleResamplerChain
+        Chain results containing state sequences, ensemble member indices,
+        and diagnostics for all walkers.
 
-   	 	Notes
-    	-----
-    	The algorithm uses a Metropolis-Hastings sampler with two types of moves:
+    Notes
+    -----
+    This method requires pre-computed posterior ensembles and their corresponding
+    log-density values. The ensembles can be generated using `run_mcmc_per_state()`
+    and the pseudo-prior values using automatic fitting routines.
 
-    	1. **Between-state moves** (probability `prob_state`):
-       	- Propose a new state uniformly at random
-       	- Generate new parameters from the pseudo-prior of the proposed state
-       	- Accept/reject based on posterior and pseudo-prior ratios
+    The algorithm works by:
+    1. Selecting ensemble members within states based on posterior weights
+    2. Proposing transitions between states based on relative evidence
+    3. Accepting/rejecting proposals using Metropolis-Hastings criterion
 
-    	2. **Within-state moves** (probability `1 - prob_state`):
-       	- Use the user-defined proposal function to generate new parameters
-       	- Accept/reject using standard Metropolis-Hastings criterion
+    Examples
+    --------
+    >>> results = run_ensemble_resampler(
+    ...     n_walkers=32,
+    ...     n_steps=1000,
+    ...     n_states=3,
+    ...     n_dims=[2, 3, 1],
+    ...     log_posterior_ens=posterior_ensembles,
+    ...     log_pseudo_prior_ens=pseudo_prior_ensembles
+    ... )
 
-    	The pseudo-prior must be normalized for the between-state acceptance
-    	criterion to satisfy detailed balance.
-    
+    Using with forward pool for parallel forward solver calls:
+
+    >>> from concurrent.futures import ProcessPoolExecutor
+    >>> with ProcessPoolExecutor(max_workers=4) as forward_pool:
+    ...     results = run_ensemble_resampler(
+    ...         n_walkers=32,
+    ...         n_steps=1000,
+    ...         n_states=3,
+    ...         n_dims=[2, 3, 1],
+    ...         log_posterior_ens=posterior_ensembles,
+    ...         log_pseudo_prior_ens=pseudo_prior_ensembles,
+    ...         forward_pool=forward_pool
+    ...     )
     """
 
 ## Example
 
+```python
+import numpy as np
+from pytransc.samplers import run_state_jump_sampler
+```
 Detailed examples of showing implementation of all three samplers can be found in
 
-[`examples/Gaussians`](./examples/Gaussians/) - Sampling across unnormalised Multi-dimensional Gaussians with all three samplers. (Repeated from paper.)
+[`examples/Regression`](./examples/Regression/) - Sampling across 4 states in polynomial regression with all three samplers.
 
-[`examples/AirborneEM`](./examples/AirborneEM) - Ensemble Sampler applied to Airborne EM data. (Repeated from paper.)
+[`examples/AirborneEM`](./examples/AirborneEM) - Ensemble Sampler applied to Airborne EM data.
 
-[`examples/Regression`](./examples/Regression/) - Model choice of a simple polynomial regression problem with comparison to analytical Evidence calculations. Includes examples of how all three samplers, and their preprocessing, can be performed in parallel. 
-
+[`examples/Tomography`](./examples/Tomography) - Ensemble Sampler applied to 2D borehole tomography to demonstrate three level parallelism.
 
 ## Licensing
 `pytransc` is released as BSD-2-Clause licence.
@@ -130,6 +147,8 @@ Detailed examples of showing implementation of all three samplers can be found i
 ## Citations and Acknowledgments
 
 > *Sambridge, M., Valentine, A. & Hauser, J., 2025. Trans-Conceptual Sampling: Bayesian Inference With Competing Assumptions, JGR Solid Earth, Volume 130, Issue 8, 17 August 2025, e2024JB030470.*
+
+
 
 
 
