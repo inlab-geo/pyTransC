@@ -37,6 +37,30 @@ notebooks = [
     "jupyterlab>=4.4.4",
 ]
 
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+# Markers - Define ONLY here, not in conftest.py
+markers = [
+    "unit: unit tests (auto-applied to tests/unit/)",
+    "integration: integration tests (auto-applied to tests/integration/)",
+    "numerical: tests requiring statistical validation (auto-applied to tests/numerical/)",
+    "slow: slow-running tests that can be skipped in CI",
+    "parallel: tests that use parallelization features",
+]
+
+# Output and strictness options
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+]
+
 [tool.ruff.lint]
 select = [
     "B007",    # Loop control variable {name} not used within loop body

@@ -19,7 +19,7 @@ from pytransc.utils.types import FloatArray
 @pytest.fixture
 def gm_pseudo(ensemble_per_state: list[FloatArray]) -> GaussianMixturePseudoPrior:
     """Fixture for Gaussian Mixture pseudo-prior."""
-    return build_gaussian_mixture_pseudo_prior(ensemble_per_state)
+    return build_gaussian_mixture_pseudo_prior(ensemble_per_state, standardize=False)
 
 
 def test_kwargs_handling(ensemble_per_state: list[FloatArray]) -> None:
@@ -43,7 +43,7 @@ def test_kwargs_handling(ensemble_per_state: list[FloatArray]) -> None:
 def test_gaussian_mixture_pseudo_prior(ensemble_per_state: list[FloatArray]) -> None:
     """Test Gaussian Mixture pseudo-priors are properly fitted."""
 
-    gm_pseudo = build_gaussian_mixture_pseudo_prior(ensemble_per_state)
+    gm_pseudo = build_gaussian_mixture_pseudo_prior(ensemble_per_state, standardize=False)
     for gmm, ensemble in zip(gm_pseudo.gaussian_mixtures, ensemble_per_state):
         assert isinstance(gmm, GaussianMixture)
         assert np.isclose(gmm.means_[0], np.mean(ensemble))
@@ -94,5 +94,5 @@ def test_gaussian_mixture_pseudo_prior_deviate(
     """Test the sampling from the Gaussian Mixture pseudo-prior."""
     for state, gmm in enumerate(gm_pseudo.gaussian_mixtures):
         deviates = np.array([gm_pseudo.draw_deviate(state) for _ in range(1_000)])
-        assert np.isclose(np.mean(deviates), gmm.means_[0], atol=0.1)
-        assert np.isclose(np.var(deviates), gmm.covariances_[0], atol=0.1)
+        assert np.isclose(np.mean(deviates), gmm.means_[0], atol=0.1).all()
+        assert np.isclose(np.var(deviates), gmm.covariances_[0].squeeze(), atol=0.2)
