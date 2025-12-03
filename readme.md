@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/inlab-geo/pytransc/actions/workflows/test.yml/badge.svg)](https://github.com/inlab-geo/pytransc/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/inlab-geo/pytransc/branch/main/graph/badge.svg)](https://codecov.io/gh/inlab-geo/pytransc)
-[![Documentation](https://github.com/inlab-geo/pytransc/actions/workflows/docs.yml/badge.svg)](https://inlab-geo.github.io/pytransc/)
+[![Documentation](https://github.com/inlab-geo/pytransc/actions/workflows/docs.yml/badge.svg)](https://inlab.au/pyTransC/pytransc.html)
 ![Python](https://img.shields.io/badge/python-3.11+-brightgreen.svg)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
