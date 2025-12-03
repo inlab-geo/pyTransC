@@ -23,3 +23,5 @@ Basic usage with product space sampler:
     ...     log_pseudo_prior=my_log_pseudo_prior
     ... )
 """
+
+__version__ = "0.3.0a1"
