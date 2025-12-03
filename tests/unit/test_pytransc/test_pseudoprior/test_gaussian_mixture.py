@@ -92,7 +92,8 @@ def test_gaussian_mixture_pseudo_prior_deviate(
     gm_pseudo: GaussianMixturePseudoPrior,
 ) -> None:
     """Test the sampling from the Gaussian Mixture pseudo-prior."""
+    np.random.seed(42)
     for state, gmm in enumerate(gm_pseudo.gaussian_mixtures):
-        deviates = np.array([gm_pseudo.draw_deviate(state) for _ in range(1_000)])
+        deviates = np.array([gm_pseudo.draw_deviate(state) for _ in range(10_000)])
         assert np.isclose(np.mean(deviates), gmm.means_[0], atol=0.1).all()
         assert np.isclose(np.var(deviates), gmm.covariances_[0].squeeze(), atol=0.2)

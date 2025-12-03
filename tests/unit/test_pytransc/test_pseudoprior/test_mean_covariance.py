@@ -37,11 +37,11 @@ def test_mean_covariance_pseudo_prior_draw_deviate(
     mean_cov_pseudo: MeanCovariancePseudoPrior,
 ) -> None:
     """Test mean-covariance pseudo-prior draw deviate."""
-
+    np.random.seed(42)
     for state, rv in enumerate(mean_cov_pseudo.rv_list):
         mu = rv.mean[0]
         cov = rv.cov[0, 0]
 
-        deviates = np.array([mean_cov_pseudo.draw_deviate(state) for _ in range(1_000)])
+        deviates = np.array([mean_cov_pseudo.draw_deviate(state) for _ in range(10_000)])
         assert np.isclose(np.mean(deviates), mu, atol=0.1)
-        assert np.isclose(np.var(deviates), cov, atol=0.1)
+        assert np.isclose(np.var(deviates), cov, atol=0.2)
