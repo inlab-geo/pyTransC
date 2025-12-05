@@ -15,9 +15,18 @@ This repository contains source code to implement three Trans-Conceptual MCMC sa
 
 ## Installation
 
+The dvelopment version can be installed from this repository
+
 ```
 pip install git+https://github.com/inlab-geo/pytransc
 ```
+
+A release can be installed from pypi 
+
+```
+pip install pytransc
+```
+
 ## Documentation
 
 This package of with a single class `TransC_Sampler` implementing three separate MCMC samplers across independent model states implemented as functions of the class
@@ -129,6 +138,11 @@ Here is the docstring of the function `run_state_jump_sampler()`:
     ...         forward_pool=forward_pool
     ...     )
     """
+
+
+## API documentation
+
+API documentation is auto-generated using [pdoc](https://pdoc.dev/) is available [here](https://inlab.au/pyTransC/pytransc.html)
 
 ## Example
 
