@@ -32,6 +32,10 @@ packages = ["src/pytransc"]
 [dependency-groups]
 dev = [
     "pytest>=8.4.1",
+    "pytest-cov>=6.0.0",
+]
+docs = [
+    "pdoc>=14.0.0",
 ]
 notebooks = [
     "jupyterlab>=4.4.4",

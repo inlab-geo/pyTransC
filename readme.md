@@ -1,7 +1,10 @@
 # pytransc
 
-![Python3](https://img.shields.io/badge/python-3.x-brightgreen.svg)
-<a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
+[![Tests](https://github.com/inlab-geo/pytransc/actions/workflows/test.yml/badge.svg)](https://github.com/inlab-geo/pytransc/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/inlab-geo/pytransc/branch/main/graph/badge.svg)](https://codecov.io/gh/inlab-geo/pytransc)
+[![Documentation](https://github.com/inlab-geo/pytransc/actions/workflows/docs.yml/badge.svg)](https://inlab.au/pyTransC/pytransc.html)
+![Python](https://img.shields.io/badge/python-3.11+-brightgreen.svg)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 _Python library for implementing TransC MCMC sampling_
 
