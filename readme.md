@@ -158,6 +158,20 @@ Detailed examples of showing implementation of all three samplers can be found i
 
 [`examples/Tomography`](./examples/Tomography) - Ensemble Sampler applied to 2D borehole tomography to demonstrate three level parallelism.
 
+## Releasing to PyPI
+
+The version is automatically derived from git tags using `hatch-vcs`. To publish a new release:
+
+1. Make sure all changes are merged into `main`.
+2. Create and push a version tag:
+   ```bash
+   git tag v0.3.0
+   git push origin v0.3.0
+   ```
+3. The [publish-to-pypi](/.github/workflows/publish-to-pypi.yml) GitHub Actions workflow will automatically build and publish the package to both PyPI and TestPyPI.
+
+Tag names must start with `v` (e.g. `v0.3.0`, `v1.0.0a1`). The version in the published package is derived from the tag, so no manual version bumps are needed.
+
 ## Licensing
 `pytransc` is released as BSD-2-Clause licence.
 
