@@ -24,4 +24,4 @@ Basic usage with product space sampler:
     ... )
 """
 
-__version__ = "0.3.0a1"
+from pytransc._version import __version__, __version_tuple__

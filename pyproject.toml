@@ -1,7 +1,7 @@
 [project]
 name = "pytransc"
-version = "0.3.0a1"
 description = "Python library for implementing TransC MCMC sampling"
+dynamic = ["version"]
 readme = "readme.md"
 authors = [
     { name = "Malcolm Sambridge", email = "malcolm.sambridge@anu.edu.au" },
@@ -23,8 +23,14 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/pytransc/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pytransc"]

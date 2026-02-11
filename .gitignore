@@ -57,3 +57,7 @@ examples/**/gaussians_functions.py
 examples/**/regression_functions.py
 examples/**/tomography_functions.py
 examples/**/gravity_functions.py
+
+# Auto-generated version file (hatch-vcs) #
+############################################
+src/pytransc/_version.py
